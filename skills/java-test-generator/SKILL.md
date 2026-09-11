@@ -3,119 +3,133 @@ name: java-test-generator
 description: Add or improve Java and Spring Boot tests, including unit, slice, integration, and regression tests. Use when tests are the primary deliverable; do not trigger merely because an implementation or review should include verification.
 ---
 
-# Java Test Generator
+# Java 测试生成
 
-Tests should prove behavior, not mirror implementation.
+测试应证明行为，而不是复刻实现细节。
 
-Use `java-backend-dev` when tests accompany a production-code change, and `springboot-code-review` when the task is to assess existing tests rather than create or modify them.
+当测试只是生产代码变更的一部分时，使用 `java-backend-dev`；当任务是评估已有测试而非创建或修改测试时，使用 `springboot-code-review`。
 
-## 1. Inspect the project
+## 1. 检查项目
 
-Determine:
-- JUnit version;
-- Mockito/AssertJ/Hamcrest usage;
-- Spring test conventions;
-- test naming/style;
-- fixture/builders;
-- DB test strategy;
-- Testcontainers/embedded DB usage;
-- CI constraints.
+确定：
 
-Match existing style before introducing libraries.
+- JUnit 版本；
+- Mockito/AssertJ/Hamcrest 的使用方式；
+- Spring 测试约定；
+- 测试命名和风格；
+- fixture/builder；
+- DB 测试策略；
+- Testcontainers/内嵌 DB 的使用方式；
+- CI 限制。
 
-## 2. Choose the test level
+引入新库之前，先匹配项目现有风格。
 
-Prefer the lowest level that reliably proves the requirement.
+## 2. 选择测试层级
+
+优先选择能够可靠证明需求的最低测试层级。
 
 ### Unit test
-Use for:
-- pure business rules;
-- validation/branching;
-- transformations;
-- calculations.
+
+适用于：
+
+- 纯业务规则；
+- 校验和分支逻辑；
+- 数据转换；
+- 计算逻辑。
 
 ### Slice test
-Use when framework wiring matters:
-- MVC request binding/validation/serialization;
-- repository query mapping where supported.
+
+在框架装配行为很重要时使用：
+
+- MVC 请求绑定、校验和序列化；
+- 框架支持的 repository 查询映射。
 
 ### Integration test
-Use when correctness depends on:
-- real DB semantics;
-- transactions;
-- ORM mappings;
-- Spring configuration;
-- Redis/MQ contracts where test infrastructure exists.
 
-Do not use `@SpringBootTest` for everything.
+在正确性依赖以下因素时使用：
 
-## 3. Test design
+- 真实 DB 语义；
+- transaction；
+- ORM 映射；
+- Spring 配置；
+- 已有测试基础设施支持的 Redis/MQ 契约。
 
-For changed behavior, cover applicable cases:
+不要所有场景都使用 `@SpringBootTest`。
 
-- happy path;
-- null/empty input;
-- minimum/maximum/boundary values;
-- invalid state transition;
-- duplicate/retry request;
-- exception path;
-- date/time boundary;
-- BigDecimal scale/rounding;
-- authorization/data-scope boundary where relevant.
+## 3. 测试设计
 
-For bug fixes, create a regression test that fails on the old behavior whenever practical.
+对于变更行为，按需覆盖：
 
-## 4. Mockito discipline
+- 正常路径；
+- null/空输入；
+- 最小值、最大值和边界值；
+- 非法状态转换；
+- 重复请求或重试请求；
+- 异常路径；
+- 日期和时间边界；
+- BigDecimal 精度和舍入；
+- 适用时的授权和数据范围边界。
 
-Mock external collaborators, not the class under test.
+对于 bug 修复，在可行时创建一个在旧行为下会失败的 regression test。
 
-Avoid:
-- mocking value objects;
-- mocking static utilities unless unavoidable;
-- asserting every internal method call;
-- overspecified interaction order.
+## 4. Mockito 使用纪律
 
-Verify interactions when they are themselves important behavior, e.g. “do not publish event if DB update failed”.
+Mock 外部协作者，不要 Mock 被测类本身。
 
-## 5. Database tests
+避免：
 
-When query semantics are the risk:
-- use representative rows;
-- include duplicates/nulls/status combinations;
-- assert exact result grain;
-- test transaction/constraint behavior where relevant.
+- Mock value object；
+- 除非无法避免，否则不要 Mock static utility；
+- 断言每一个内部方法调用；
+- 过度限定交互顺序。
 
-H2 is not proof of MySQL-specific behavior. Prefer the project’s real-DB/Testcontainers approach for MySQL-specific SQL if available.
+当交互本身就是重要行为时才验证交互，例如“DB 更新失败时不得发布 event”。
 
-## 6. Concurrency/idempotency tests
+## 5. Database 测试
 
-If the implementation claims to prevent duplicates/races:
-- test repeated identical request;
-- test stale expected-state update;
-- use concurrent execution only when deterministic enough to be useful;
-- prefer asserting DB unique/state-transition guarantees to timing-sensitive sleeps.
+当查询语义是主要风险时：
 
-## 7. Naming
+- 使用具有代表性的数据行；
+- 包含重复值、null 和不同状态组合；
+- 断言准确的结果粒度；
+- 在适用时测试 transaction 和 constraint 行为。
 
-Test names should express:
+H2 不能证明 MySQL 特有行为。对于 MySQL 特有 SQL，如果项目已有真实 DB/Testcontainers 方案，应优先沿用。
+
+## 6. 并发与幂等测试
+
+如果实现声称能够避免重复或竞态：
+
+- 测试重复的相同请求；
+- 测试基于过期预期状态的更新；
+- 仅在结果足够确定且有意义时执行并发测试；
+- 优先断言 DB unique constraint 或状态转换保证，避免依赖时序的 sleep。
+
+## 7. 命名
+
+测试名称应表达：
+
 `condition -> expected behavior`
 
-Follow the project convention, e.g.:
-`shouldRejectDuplicatePaymentWhenOrderAlreadyPaid`.
+遵循项目约定，例如：
 
-## 8. Execution
+`shouldRejectDuplicatePaymentWhenOrderAlreadyPaid`。
 
-Run:
-1. the new/modified test class;
-2. relevant module tests;
-3. broader tests only when justified.
+## 8. 执行
 
-Never say tests passed if only generated.
+依次运行：
 
-## Completion
+1. 新增或修改的测试类；
+2. 相关模块测试；
+3. 仅在有充分理由时运行更广泛的测试。
 
-Report:
-- tests added/changed;
-- behaviors covered;
-- commands run and result;
-- meaningful untested risk.
+如果只是生成了测试，绝不能声称测试已通过。
+
+## 完成说明
+
+报告：
+
+- 新增或修改了哪些测试；
+- 覆盖了哪些行为；
+- 实际执行的命令及结果；
+- 仍未覆盖的实质性风险。

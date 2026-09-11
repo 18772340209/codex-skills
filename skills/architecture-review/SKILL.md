@@ -3,194 +3,210 @@ name: architecture-review
 description: Design or review Java backend and distributed-system architecture, including consistency, reliability, scaling, messaging, caching, locking, sharding, and scheduling decisions. Do not use for ordinary implementation, line-level code review, or incident diagnosis.
 ---
 
-# Java Backend Architecture Review
+# Java 后端架构评审
 
-Do not start with middleware. Start with requirements.
+不要从 middleware 开始，应从需求开始。
 
-This skill produces system-level decisions and tradeoffs. Use `java-backend-dev` for routine code changes, `springboot-code-review` for defect-focused review of existing code, and `springboot-debug` for evidence-driven incident diagnosis.
+本 Skill 产出系统级决策与取舍。日常代码变更使用 `java-backend-dev`，针对已有代码的缺陷审查使用 `springboot-code-review`，基于证据的故障诊断使用 `springboot-debug`。
 
-## 1. Establish constraints
+## 1. 确立约束
 
-Extract or estimate only when explicitly allowed:
+提取以下信息；只有在明确允许时才能估算：
 
-- business invariant;
-- read/write QPS;
-- peak/average ratio;
-- data volume and growth;
-- latency target (P95/P99);
-- availability target;
-- consistency requirement;
-- acceptable delay;
-- duplicate tolerance;
-- ordering requirement;
-- recovery/RTO/RPO expectations;
-- team/ops complexity;
-- existing infrastructure.
+- business invariant；
+- 读写 QPS；
+- peak/average ratio；
+- 数据量和增长速度；
+- latency 目标（P95/P99）；
+- availability 目标；
+- consistency 要求；
+- 可接受延迟；
+- 对重复的容忍度；
+- ordering 要求；
+- recovery/RTO/RPO 预期；
+- 团队与 ops 复杂度；
+- 现有 infrastructure。
 
-If exact numbers are missing, state assumptions instead of pretending.
+缺少准确数字时，明确说明假设，不要伪装成已知事实。
 
-## 2. Define invariants
+## 2. 定义 invariant
 
-Examples:
-- an order cannot be paid twice;
-- inventory cannot go below zero;
-- settlement amount must be reproducible/auditable;
-- cancellation after successful payment must not silently win;
-- a message may be delivered more than once but business effect must occur once.
+示例：
 
-Architecture should protect invariants explicitly.
+- 一个订单不能被支付两次；
+- 库存不能低于零；
+- 结算金额必须可复现、可审计；
+- 支付成功后，取消操作不能静默覆盖支付结果；
+- message 可以投递多次，但业务效果只能发生一次。
 
-## 3. Start with the simplest viable design
+架构应显式保护 invariant。
 
-For low/moderate scale, consider:
-- DB transaction;
-- unique constraints;
-- conditional updates;
-- scheduled scan;
-- single relational DB;
-- ordinary cache-aside.
+## 3. 从最简单的可行设计开始
 
-Do not introduce MQ, distributed locks, sharding, or event sourcing because they sound “distributed”.
+对于低到中等规模，考虑：
 
-## 4. Scale-out triggers
+- DB transaction；
+- unique constraint；
+- conditional update；
+- scheduled scan；
+- 单个 relational DB；
+- 常规 cache-aside。
 
-Recommend additional machinery only with a trigger.
+不要仅仅因为 MQ、distributed lock、sharding 或 event sourcing 听起来“分布式”就引入它们。
 
-Examples:
+## 4. Scale-out 触发条件
+
+只有存在明确触发条件时才建议增加机制。
+
+示例：
 
 ### Scheduled scan -> delayed MQ/time wheel
-Trigger:
-- scan cost/latency grows;
-- cancellation timeliness becomes stricter;
-- DB polling load becomes material.
+
+触发条件：
+
+- scan 成本或 latency 增长；
+- 取消及时性要求变得更严格；
+- DB polling load 已不可忽略。
 
 ### Single DB -> read replica/sharding
-Trigger:
-- measured DB CPU/IO/storage/throughput limits;
-- table/index size or maintenance becomes operationally problematic.
+
+触发条件：
+
+- 实测 DB CPU/IO/storage/throughput 接近限制；
+- table/index 规模或维护已经带来运维问题。
 
 ### Sync call -> MQ
-Trigger:
-- caller should not block;
-- downstream throughput mismatch requires buffering;
-- fan-out/event integration is needed;
-- failure isolation/retry semantics are valuable.
+
+触发条件：
+
+- caller 不应阻塞；
+- downstream throughput 不匹配，需要 buffering；
+- 需要 fan-out/event integration；
+- failure isolation/retry 语义有明确价值。
 
 ## 5. Consistency model
 
-For every write flow, define:
+对每条写入流程定义：
 
-- source of truth;
-- transaction boundary;
-- idempotency key;
-- state machine;
-- retry behavior;
-- duplicate behavior;
-- timeout ambiguity;
-- compensation/reconciliation;
-- cache update/invalidation;
-- message publish atomicity.
+- source of truth；
+- transaction boundary；
+- idempotency key；
+- state machine；
+- retry 行为；
+- duplicate 行为；
+- timeout ambiguity；
+- compensation/reconciliation；
+- cache update/invalidation；
+- message publish atomicity。
 
-Use patterns where justified:
-- unique key;
-- compare-and-set status update;
-- outbox;
-- transactional message;
-- reconciliation job.
+在有充分理由时使用：
 
-## 6. MQ design
+- unique key；
+- compare-and-set status update；
+- outbox；
+- transactional message；
+- reconciliation job。
 
-Specify:
-- producer success/failure semantics;
-- key/partition choice;
-- consumer idempotency;
-- retry policy;
-- poison/dead-letter handling;
-- ordering scope;
-- backlog behavior;
-- observability.
+## 6. MQ 设计
 
-“Use MQ” is not a complete design.
+明确：
 
-## 7. Cache design
+- producer success/failure 语义；
+- key/partition 选择；
+- consumer 幂等；
+- retry policy；
+- poison/dead-letter 处理；
+- ordering 范围；
+- backlog 行为；
+- observability。
 
-Specify:
-- whether cache is optimization or authority;
-- key/TTL;
-- read/write sequence;
-- stale-data tolerance;
-- hot-key mitigation if needed;
-- invalidation failure recovery.
+“使用 MQ”不是完整设计。
 
-Strong consistency requirements usually push critical decisions to the DB/source of truth.
+## 7. Cache 设计
+
+明确：
+
+- cache 是优化手段还是权威数据源；
+- key/TTL；
+- 读写顺序；
+- stale data 容忍度；
+- 需要时的 hot key 缓解方案；
+- invalidation failure 恢复方式。
+
+强一致性要求通常意味着关键决策必须由 DB/source of truth 承担。
 
 ## 8. Locking
 
-Before distributed locks, ask whether one of these is enough:
-- unique constraint;
-- atomic DB update with expected state;
-- optimistic lock/version;
-- row lock.
+使用 distributed lock 之前，先判断以下方式是否已经足够：
 
-If distributed lock is required, define:
-- lock key granularity;
-- lease duration/renewal;
-- owner token;
-- safe release;
-- behavior on lock loss;
-- whether fencing is required.
+- unique constraint；
+- 带预期状态的 atomic DB update；
+- optimistic lock/version；
+- row lock。
 
-## 9. Capacity and performance
+如果必须使用 distributed lock，定义：
 
-Tie claims to metrics:
-- QPS/TPS;
-- DB rows scanned;
-- connection/thread pool occupancy;
-- queue lag;
-- cache hit rate;
-- P95/P99;
-- GC;
-- CPU/IO/network.
+- lock key 粒度；
+- lease duration/renewal；
+- owner token；
+- safe release；
+- lock 丢失后的行为；
+- 是否需要 fencing。
 
-Avoid arbitrary “QPS 10k means you need X”.
+## 9. Capacity 与 performance
+
+所有判断都应绑定 metrics：
+
+- QPS/TPS；
+- DB rows scanned；
+- connection/thread pool occupancy；
+- queue lag；
+- cache hit rate；
+- P95/P99；
+- GC；
+- CPU/IO/network。
+
+避免武断地声称“QPS 达到 10k 就需要 X”。
 
 ## 10. Failure analysis
 
-Walk through:
-- process crash before/after DB commit;
-- timeout with unknown remote outcome;
-- MQ duplicate;
-- MQ delayed/out-of-order;
-- Redis unavailable;
-- DB failover;
-- job rerun;
-- partial batch failure.
+逐一分析：
 
-State how the system converges back to correct state.
+- DB commit 前后发生 process crash；
+- timeout 且 remote outcome 未知；
+- MQ duplicate；
+- MQ delayed/out-of-order；
+- Redis 不可用；
+- DB failover；
+- job rerun；
+- partial batch failure。
+
+说明系统如何最终收敛回正确状态。
 
 ## 11. Observability
 
-Define the minimum:
-- success/error counters;
-- latency histogram;
-- backlog/lag;
-- retry/dead-letter count;
-- reconciliation mismatch count;
-- business invariant alarms;
-- correlation/order/message IDs in logs.
+定义最低要求：
 
-## 12. Recommendation format
+- success/error counter；
+- latency histogram；
+- backlog/lag；
+- retry/dead-letter count；
+- reconciliation mismatch count；
+- business invariant alarm；
+- 日志中的 correlation/order/message ID。
 
-Return:
+## 12. 建议格式
 
-1. Requirements/assumptions.
-2. Recommended design.
-3. Core data/state model.
-4. Critical request/event sequence.
-5. Consistency/idempotency strategy.
-6. Failure and recovery behavior.
-7. Capacity/scaling trigger.
-8. Alternatives rejected and why.
-9. Verification/load-test plan.
+返回：
 
-Prefer an evolvable simple design over a prematurely complex target-state architecture.
+1. 需求和假设；
+2. 推荐设计；
+3. 核心数据和 state model；
+4. 关键 request/event sequence；
+5. consistency/idempotency 策略；
+6. failure 和 recovery 行为；
+7. capacity/scaling 触发条件；
+8. 被否决的替代方案及原因；
+9. verification/load-test 计划。
+
+优先选择可演进的简单设计，而不是过早构建复杂的目标态架构。

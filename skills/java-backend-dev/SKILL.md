@@ -3,214 +3,219 @@ name: java-backend-dev
 description: Implement or modify Java and Spring Boot backend production code, including features, APIs, services, data access, integrations, and ordinary bug fixes. Do not use for review-only, diagnosis-only, test-only, SQL-analysis, or architecture-design requests.
 ---
 
-# Java Backend Development
+# Java 后端开发
 
-Use this as the default implementation workflow for Java backend work. It is an execution skill, not a Java tutorial.
+将本 Skill 作为 Java 后端工作的默认实现流程。它是执行型 Skill，不是 Java 教程。
 
-For specialized work, use `springboot-code-review` for review-only requests, `springboot-debug` when the root cause is unknown, `java-test-generator` when tests are the primary deliverable, `mysql-sql-review` for dedicated MySQL analysis, and `architecture-review` for system-design decisions. Implementation may still include proportionate review, debugging, tests, SQL checks, or design reasoning without changing the primary skill.
+专业任务应使用对应 Skill：仅审查请求使用 `springboot-code-review`；root cause 未知时使用 `springboot-debug`；测试是主要交付物时使用 `java-test-generator`；专门的 MySQL 分析使用 `mysql-sql-review`；系统设计决策使用 `architecture-review`。实现任务仍可包含适量的审查、诊断、测试、SQL 检查或设计推理，而无需改变主 Skill。
 
-## Priorities
+## 优先级
 
-1. User requirements override this skill.
-2. Existing project conventions beat generic best practices unless they are clearly unsafe.
-3. Prefer the smallest change that fully solves the requirement.
-4. Do not introduce architecture, abstractions, dependencies, or infrastructure without a concrete need.
-5. Never claim compilation/tests passed unless they were actually executed successfully.
+1. 用户要求高于本 Skill；
+2. 除非现有项目约定明显不安全，否则它优先于通用最佳实践；
+3. 优先采用能够完整解决需求的最小变更；
+4. 没有具体需要时，不要引入新架构、抽象、dependency 或 infrastructure；
+5. 除非实际成功执行，否则绝不能声称 compilation/test 已通过。
 
-## 1. Inspect before editing
+## 1. 修改前检查
 
-Before changing code, inspect the minimum files needed to establish:
+修改代码前，检查能够确定以下信息的最少文件：
 
-- Java version.
-- Spring Boot/Spring Framework version.
-- Maven or Gradle and wrapper availability.
-- Module boundaries.
-- Package and naming conventions.
-- Controller / Service / Repository or Mapper conventions.
-- ORM/data access: MyBatis, MyBatis-Plus, JPA, JDBC, jOOQ, etc.
-- Existing response envelope, exception handling, validation, logging, pagination, conversion, constants, enums, and utility patterns.
-- Relevant Redis/MQ/RPC/HTTP/database infrastructure.
-- Existing tests around the affected code.
+- Java 版本；
+- Spring Boot/Spring Framework 版本；
+- Maven 或 Gradle，以及 wrapper 是否可用；
+- module 边界；
+- package 和命名约定；
+- Controller/Service/Repository 或 Mapper 约定；
+- ORM/data access：MyBatis、MyBatis-Plus、JPA、JDBC、jOOQ 等；
+- 现有 response envelope、exception handling、validation、logging、pagination、conversion、constant、enum 和 utility 模式；
+- 相关 Redis/MQ/RPC/HTTP/database infrastructure；
+- 受影响代码附近的现有测试。
 
-Prefer evidence from `pom.xml`, `build.gradle*`, wrapper files, application configuration, code, tests, and migration/schema files. Do not infer versions from memory.
+优先从 `pom.xml`、`build.gradle*`、wrapper 文件、application configuration、代码、测试和 migration/schema 文件中获取证据。不要凭记忆推断版本。
 
-## 2. Trace the change surface
+## 2. 追踪变更范围
 
-For a feature or bug, trace the relevant path before coding:
+处理 feature 或 bug 时，编码前先追踪相关路径：
 
 `Controller/API -> Service -> domain/business logic -> Mapper/Repository -> SQL/table`
 
-Also inspect, when relevant:
+适用时还应检查：
 
-- callers of the modified method;
-- downstream calls;
-- scheduled jobs;
-- MQ producers/consumers;
-- cache reads/writes;
-- transaction boundaries;
-- database constraints and indexes;
-- tests.
+- 被修改方法的 caller；
+- downstream call；
+- scheduled job；
+- MQ producer/consumer；
+- cache read/write；
+- transaction boundary；
+- database constraint 和 index；
+- test。
 
-Search for similar implementations before adding new code.
+添加新代码之前，先搜索类似实现。
 
-## 3. Plan a minimal change
+## 3. 规划最小变更
 
-Before editing, be able to answer internally:
+编辑前，应能在内部回答：
 
-- What behavior changes?
-- Which files actually need modification?
-- Does an API contract change?
-- Does a DB schema or SQL change?
-- Does cache/MQ behavior change?
-- What compatibility risk exists?
-- What is the cheapest meaningful verification?
+- 哪些行为会改变？
+- 实际需要修改哪些文件？
+- API contract 是否变化？
+- DB schema 或 SQL 是否变化？
+- cache/MQ 行为是否变化？
+- 存在哪些 compatibility risk？
+- 成本最低且有意义的验证是什么？
 
-If the task is straightforward, do not produce a long design document.
+任务直接明确时，不要输出冗长的设计文档。
 
-## 4. Layering defaults
+## 4. 默认分层原则
 
-Follow existing project layering first. If the project has no clear convention:
+优先遵循项目现有分层。如果项目没有明确约定：
 
 ### Controller
-- Bind and validate request data.
-- Perform authorization checks only where the project places them.
-- Delegate business logic.
-- Return the project's standard response shape.
-- Do not access the database directly.
-- Do not embed multi-step business workflows.
+
+- 绑定并校验请求数据；
+- 只在项目规定的位置执行 authorization check；
+- 委托 business logic；
+- 返回项目标准 response shape；
+- 不直接访问 database；
+- 不嵌入多步骤业务工作流。
 
 ### Service
-- Own business decisions and orchestration.
-- Define transaction boundaries.
-- Coordinate repositories/mappers and external systems.
-- Keep methods cohesive; extract only when reuse/readability justifies it.
+
+- 承担业务决策和 orchestration；
+- 定义 transaction boundary；
+- 协调 repository/mapper 与外部系统；
+- 保持方法 cohesive，只有复用性或可读性确有收益时才提取。
 
 ### Repository / Mapper
-- Own data access.
-- Keep business policy out of SQL/mappers unless the project intentionally models it there.
+
+- 承担 data access；
+- 除非项目有意如此建模，否则不要把业务策略放进 SQL/mapper。
 
 ### DTO / VO / Entity
-Use separate types when boundaries or semantics differ. Do not create DTO/VO/Command/Assembler layers mechanically for trivial operations.
 
-## 5. Java correctness checks
+当边界或语义不同时使用独立类型。不要为简单操作机械地创建 DTO/VO/Command/Assembler 分层。
 
-Check changed code for:
+## 5. Java 正确性检查
 
-- nullable inputs/returns and NPE risk;
-- collection emptiness and mutation;
-- `equals`/`hashCode`;
-- `BigDecimal` scale, comparison, rounding;
-- date/time zones and inclusive/exclusive boundaries;
-- enum unknown values;
-- numeric overflow and narrowing conversion;
-- Optional misuse;
-- resource closing;
-- exception swallowing;
-- mutable shared state;
-- unsafe stream/parallelStream use;
-- sensitive values in logs.
+检查变更代码中的：
 
-Prefer readable loops/branches over clever stream chains when business logic becomes harder to audit.
+- nullable input/return 和 NPE 风险；
+- collection 是否为空及 mutation；
+- `equals`/`hashCode`；
+- `BigDecimal` scale、比较和 rounding；
+- date/time zone 以及 inclusive/exclusive boundary；
+- enum unknown value；
+- numeric overflow 和 narrowing conversion；
+- Optional 误用；
+- resource closing；
+- exception swallowing；
+- mutable shared state；
+- 不安全的 stream/parallelStream 使用；
+- 日志中的敏感值。
 
-## 6. Transactions
+当 business logic 因复杂 stream chain 而难以审计时，优先使用易读的 loop/branch。
 
-When DB writes are involved, inspect:
+## 6. Transaction
 
-- transaction scope and duration;
-- Spring proxy/self-invocation limitations;
-- checked exception rollback behavior where relevant;
-- calls crossing async/thread boundaries;
-- remote HTTP/RPC/MQ calls inside DB transactions;
-- lock order and deadlock risk;
-- batch size;
-- retry behavior.
+涉及 DB 写入时，检查：
 
-Do not assume Redis or MQ participates in a local DB transaction.
+- transaction scope 和 duration；
+- Spring proxy/self-invocation 限制；
+- 适用时 checked exception 的 rollback 行为；
+- 跨 async/thread boundary 的调用；
+- DB transaction 内部的 remote HTTP/RPC/MQ 调用；
+- lock order 和 deadlock 风险；
+- batch size；
+- retry 行为。
 
-## 7. Concurrency and idempotency
+不要假设 Redis 或 MQ 参与本地 DB transaction。
 
-Only elevate concurrency controls when the business flow can actually race.
+## 7. 并发与幂等
 
-Check for:
+只有业务流程确实可能发生 race 时，才提升并发控制等级。
 
-- duplicate submission;
-- lost update;
-- check-then-act races;
-- repeated MQ delivery;
-- concurrent scheduled execution;
-- optimistic/pessimistic locking needs;
-- distributed lock ownership and safe release;
-- unique constraints as an idempotency primitive;
-- state transitions with expected-current-state conditions.
+检查：
 
-Prefer durable DB constraints/state transitions over Redis locks when they solve the problem more directly.
+- duplicate submission；
+- lost update；
+- check-then-act race；
+- MQ 重复投递；
+- scheduled task 并发执行；
+- optimistic/pessimistic locking 需求；
+- distributed lock ownership 和 safe release；
+- 作为幂等基础的 unique constraint；
+- 带 expected-current-state 条件的 state transition。
+
+如果 durable DB constraint/state transition 能更直接地解决问题，应优先于 Redis lock。
 
 ## 8. Redis
 
-When cache changes are involved, inspect:
+涉及 cache 变更时，检查：
 
-- key design and TTL;
-- cache-aside ordering;
-- stale data windows;
-- deletion/update failure;
-- penetration, breakdown, avalanche risks when applicable;
-- hot/big keys;
-- serialization compatibility.
+- key 设计和 TTL；
+- cache-aside 顺序；
+- stale data window；
+- delete/update failure；
+- 适用时的 cache penetration、breakdown 和 avalanche 风险；
+- hot key/big key；
+- serialization compatibility。
 
-Do not add cache for a query until there is a demonstrated reason.
+在证明有需要之前，不要为查询添加 cache。
 
 ## 9. MQ
 
-For Kafka/RocketMQ/RabbitMQ/etc., check:
+对于 Kafka/RocketMQ/RabbitMQ 等，检查：
 
-- producer send result handling;
-- consumer idempotency;
-- duplicate delivery;
-- retry and poison/dead-letter behavior;
-- ordering requirements;
-- offset/ack timing;
-- transaction/outbox needs;
-- backlog observability.
+- producer send result 处理；
+- consumer 幂等；
+- duplicate delivery；
+- retry 和 poison/dead-letter 行为；
+- ordering requirement；
+- offset/ack timing；
+- transaction/outbox 需求；
+- backlog observability。
 
-Never assume broker-level guarantees equal business exactly-once semantics.
+绝不能假设 broker-level guarantee 等同于业务 exactly-once semantics。
 
-## 10. SQL awareness
+## 10. SQL 意识
 
-For modified queries, inspect:
+对于修改过的查询，检查：
 
-- predicate selectivity;
-- index compatibility;
-- accidental full scans;
-- N+1 or looped queries;
-- pagination correctness;
-- batch operations;
-- lock range;
-- result cardinality changes.
+- predicate selectivity；
+- index compatibility；
+- 意外 full scan；
+- N+1 或循环 query；
+- pagination 正确性；
+- batch operation；
+- lock range；
+- result cardinality 变化。
 
-For dedicated SQL performance diagnosis, use `mysql-sql-review`.
+专门的 SQL performance 诊断使用 `mysql-sql-review`。
 
-## 11. Verification
+## 11. 验证
 
-Prefer the narrowest useful checks first:
+优先执行范围最窄且有用的检查：
 
-1. Existing targeted unit/integration tests.
-2. Module compilation/test.
-3. Full project test only if practical and relevant.
+1. 现有的 targeted unit/integration test；
+2. module compilation/test；
+3. 仅在实际可行且相关时执行 full project test。
 
-Use the project's wrapper when present:
-- Maven: `./mvnw ...` or `mvn ...`
-- Gradle: `./gradlew ...` or `gradle ...`
+如果项目提供 wrapper，应优先使用：
 
-If tests cannot run, state exactly what prevented verification.
+- Maven：`./mvnw ...` 或 `mvn ...`；
+- Gradle：`./gradlew ...` 或 `gradle ...`。
 
-## 12. Completion report
+如果测试无法运行，准确说明阻碍验证的原因。
 
-Keep the final engineering report short:
+## 12. 完成报告
 
-- What changed.
-- Important files touched.
-- Key reasoning/tradeoff.
-- Verification actually run and result.
-- Remaining risk/manual check, if any.
+最终工程报告应简短说明：
 
-Do not pad the summary with generic best practices.
+- 修改了什么；
+- 涉及的重要文件；
+- 关键理由或 tradeoff；
+- 实际执行的验证及结果；
+- 仍存在的风险或 manual check（如有）。
+
+不要用通用最佳实践填充总结。

@@ -3,161 +3,181 @@ name: springboot-debug
 description: Diagnose Java and Spring Boot runtime incidents, failed startup, intermittent errors, performance regressions, resource exhaustion, and data inconsistency when the root cause is unknown. Do not use for routine implementation or review-only requests.
 ---
 
-# Spring Boot Debugging
+# Spring Boot 故障诊断
 
-Diagnose from evidence. Do not shotgun-change configuration.
+依据证据诊断，不要无差别修改配置。
 
-The primary deliverable is a supported root-cause diagnosis and verification plan. If the cause is already known and the request is simply to change code, use `java-backend-dev`; if the request is only to review an existing change, use `springboot-code-review`.
+主要交付物是有证据支持的 root cause 诊断和验证计划。如果原因已知且请求只是修改代码，使用 `java-backend-dev`；如果请求只是审查已有变更，使用 `springboot-code-review`。
 
-## 1. Define the symptom
+## 1. 定义症状
 
-Capture:
-- exact error/symptom;
-- first known occurrence;
-- affected endpoint/job/consumer;
-- scope: one instance, subset, or all;
-- frequency;
-- latency/error-rate/resource change;
-- recent deployments/config/data changes.
+记录：
 
-Separate symptom from suspected cause.
+- 准确的错误或症状；
+- 首次确认发生的时间；
+- 受影响的 endpoint/job/consumer；
+- 影响范围：单个实例、部分实例或全部实例；
+- 发生频率；
+- latency、error rate 或资源的变化；
+- 最近的 deployment、配置或数据变更。
 
-## 2. Reconstruct the request/job path
+将症状与推测原因分开。
 
-Map the relevant path:
+## 2. 重建请求或任务路径
+
+梳理相关路径：
 
 `gateway -> controller -> service -> DB/cache/RPC/MQ`
 
-For async processing:
+对于 async processing：
+
 `producer -> broker -> consumer -> DB/RPC -> ack/offset`
 
-Identify where timing/error first diverges.
+找出 timing 或 error 首次出现偏差的位置。
 
-## 3. Evidence hierarchy
+## 3. 证据优先级
 
-Prefer:
-1. stack trace/error logs;
-2. metrics;
-3. thread dump / heap evidence;
-4. DB process/lock/slow-query evidence;
-5. MQ/Redis/server metrics;
-6. configuration;
-7. code inspection.
+优先使用：
 
-Do not infer “GC problem” merely from high CPU.
+1. stack trace 和 error log；
+2. metrics；
+3. thread dump 或 heap 证据；
+4. DB process、lock 和 slow query 证据；
+5. MQ/Redis/server metrics；
+6. configuration；
+7. code inspection。
 
-## 4. Common incident playbooks
+不要仅凭 CPU 很高就推断是“GC 问题”。
 
-### Slow API
-Check:
-- trace/span timing if available;
-- slow SQL;
-- DB pool wait;
-- remote call timeout/retry;
-- Redis latency;
-- lock contention;
-- thread pool queue;
-- serialization/large payload;
-- GC pauses.
+## 4. 常见故障处置清单
 
-### High CPU
-Check:
-- top process/thread;
-- thread dump stacks;
-- hot loops/spin/retry storms;
-- excessive serialization/regex;
-- GC CPU;
-- decompression/encryption hotspots.
+### API 响应缓慢
 
-### OOM / memory growth
-Distinguish:
-- Java heap;
-- metaspace;
-- direct memory;
-- native/thread stacks;
-- container memory limit.
+检查：
 
-Use heap dump/class histogram where practical; look for retained ownership, not just biggest class count.
+- 可用时的 trace/span timing；
+- slow SQL；
+- DB pool wait；
+- remote call timeout/retry；
+- Redis latency；
+- lock contention；
+- thread pool queue；
+- serialization 或大型 payload；
+- GC pause。
 
-### DB connection pool exhaustion
-Check:
-- active/pending/idle;
-- transaction duration;
-- connection leaks;
-- slow SQL;
-- blocked transactions;
-- downstream waits occurring while holding DB connections.
+### CPU 使用率高
 
-Do not “fix” first by only increasing pool size.
+检查：
+
+- top process/thread；
+- thread dump stack；
+- hot loop、spin 或 retry storm；
+- 过量的 serialization/regex；
+- GC CPU；
+- decompression/encryption hotspot。
+
+### OOM / 内存增长
+
+区分：
+
+- Java heap；
+- metaspace；
+- direct memory；
+- native/thread stack；
+- container memory limit。
+
+在可行时使用 heap dump/class histogram；寻找 retained ownership，而不只是数量最多的 class。
+
+### DB connection pool 耗尽
+
+检查：
+
+- active/pending/idle；
+- transaction 持续时间；
+- connection leak；
+- slow SQL；
+- blocked transaction；
+- 持有 DB connection 时发生的 downstream wait。
+
+不要一开始就只通过增加 pool size“修复”问题。
 
 ### Deadlock/lock wait
-Collect DB deadlock/lock evidence. Map SQL back to service transactions, lock order, indexes, and scan range.
+
+收集 DB deadlock/lock 证据。将 SQL 映射回 service transaction、lock order、index 和 scan range。
 
 ### Redis timeout
-Check:
-- server latency;
-- network;
-- connection pool;
-- big/hot keys;
-- blocking commands;
-- timeout/retry amplification.
+
+检查：
+
+- server latency；
+- network；
+- connection pool；
+- big key/hot key；
+- blocking command；
+- timeout/retry amplification。
 
 ### MQ backlog
-Check:
-- arrival vs consume rate;
-- partition/queue distribution;
-- consumer failures/retries;
-- downstream bottleneck;
-- long per-message transaction;
-- poison messages.
 
-### Data inconsistency
-Reconstruct:
-- source of truth;
-- exact write sequence;
-- transaction commit;
-- cache invalidation;
-- event publish/consume;
-- retry/compensation;
-- duplicate operations.
+检查：
 
-## 5. Hypothesis discipline
+- 到达速率与消费速率；
+- partition/queue 分布；
+- consumer failure/retry；
+- downstream bottleneck；
+- 单条 message 的长 transaction；
+- poison message。
 
-Maintain a short ranked list:
+### 数据不一致
 
-- hypothesis;
-- supporting evidence;
-- contradicting evidence;
-- cheapest next observation.
+重建：
 
-Kill weak hypotheses quickly.
+- source of truth；
+- 准确的写入顺序；
+- transaction commit；
+- cache invalidation；
+- event publish/consume；
+- retry/compensation；
+- duplicate operation。
 
-## 6. Fix selection
+## 5. Hypothesis 纪律
 
-Prefer:
-- root-cause fix;
-- then safe containment;
-- then tuning.
+维护一个简短的优先级列表：
 
-Configuration increases (heap, pool, timeout, threads) require an explanation of why workload/capacity warrants them.
+- hypothesis；
+- 支持证据；
+- 反证；
+- 成本最低的下一项观察。
 
-## 7. Verification
+快速淘汰证据不足的 hypothesis。
 
-Define:
-- reproduction/test;
-- expected metric/log change;
-- regression risk;
-- rollback trigger;
-- production observation window if deployment follows.
+## 6. 修复选择
 
-## Output
+优先顺序：
 
-Use this structure:
+- root cause 修复；
+- 然后是安全止损；
+- 最后才是 tuning。
 
-- Symptom and blast radius
-- Most likely root cause
-- Evidence
-- Alternative hypotheses still open
-- Fix
-- Verification
-- Preventive monitoring/test
+增加 heap、pool、timeout 或 thread 等配置时，必须说明 workload/capacity 为什么支持这一调整。
+
+## 7. 验证
+
+定义：
+
+- reproduction/test；
+- 预期的 metric/log 变化；
+- regression risk；
+- rollback trigger；
+- 如果后续 deployment，定义生产观察窗口。
+
+## 输出
+
+使用以下结构：
+
+- 症状和影响范围；
+- 最可能的 root cause；
+- 证据；
+- 仍待排除的替代 hypothesis；
+- 修复方案；
+- 验证方式；
+- 预防性 monitoring/test。
